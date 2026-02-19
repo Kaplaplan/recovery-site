@@ -75,7 +75,7 @@
       flex-direction: column;
     }
 
-    header {
+    header, .header {
       position: sticky;
       top: 0;
       z-index: 100;
@@ -92,8 +92,10 @@
       display: flex;
       align-items: center;
       gap: var(--spacing-md);
+      min-width: 0;
     }
-    .header-inner nav { min-width: 0; }
+    .header-inner nav { min-width: 0; flex: 1; display: flex; align-items: center; justify-content: space-between; }
+    .header-inner .nav-links { justify-content: center; flex: 1; min-width: 0; }
 
     .logo {
       display: flex;
@@ -107,9 +109,36 @@
       white-space: nowrap;
       min-width: 0;
     }
-    .logo > span { overflow: hidden; text-overflow: ellipsis; }
+    .logo-text, .logo > span { overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 768px) {
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+      }
+      .header-inner {
+        width: 100%;
+        padding: 0;
+        height: auto;
+        min-height: 48px;
+        justify-content: space-between;
+      }
+      .nav-links { display: none !important; }
+      .mobile-menu-btn { display: flex !important; }
+      .nav-secondary > *:not(.mobile-menu-btn) { display: none !important; }
+      .logo-text, .logo > span {
+        font-size: 16px;
+        white-space: nowrap;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .logo { max-width: 65%; min-width: 0; }
+    }
     @media (max-width: 480px) {
-      .logo { max-width: 65%; }
+      .logo { max-width: 55%; }
+      .logo-text, .logo > span { max-width: 140px; }
     }
 
     .logo-mark {
@@ -1580,9 +1609,9 @@
     .ticket-status.answered { background: #d4edda; color: #155724; }
     .ticket-status.in_progress { background: #cce5ff; color: #004085; }
     .ticket-detail-reply { background: #f0f8ff; padding: 12px; border-radius: 8px; margin-top: 12px; border-left: 3px solid var(--color-accent); }
-    #withdrawModal.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
-    #withdrawModal.modal-overlay.open { display: flex; }
-    #withdrawModal .modal { position: relative; background: #fff; padding: 24px; border-radius: 12px; width: 320px; }
+    #withdrawModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); z-index: 9999; }
+    #withdrawModal.open { display: flex; }
+    #withdrawModal .modal { position: relative; margin: auto; background: #fff; padding: 24px; border-radius: 12px; width: 320px; }
     #withdrawModal .modal .modal-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: none; background: #f0f0f0; border-radius: 50%; cursor: pointer; font-size: 20px; line-height: 1; color: #333; }
     #withdrawModal .modal .modal-close:hover { background: #e0e0e0; }
     #withdrawModal .modal h3 { margin: 0 0 12px; padding-right: 28px; font-size: 18px; }
@@ -1593,11 +1622,11 @@
 </head>
 <body>
 <div class="page">
-  <header>
+  <header class="header">
     <div class="header-inner">
       <div class="logo">
         <div class="logo-mark" aria-hidden="true"></div>
-        <span>Recovery With Law</span>
+        <span class="logo-text">Recovery With Law</span>
       </div>
       <nav aria-label="Primary">
         <div class="nav-links">
@@ -2667,15 +2696,20 @@
   })();
 
   // Simple toast system
-  const toastEl = document.getElementById('toast');
-  let toastTimeoutId = null;
-
+  var toastEl = document.getElementById('toast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'toast';
+    toastEl.className = 'toast';
+    document.body.appendChild(toastEl);
+  }
+  var toastTimeoutId = null;
   function showToast(message, type) {
     if (!toastEl) return;
     toastEl.textContent = message;
     toastEl.className = 'toast toast-visible ' + (type === 'error' ? 'toast-error' : 'toast-success');
     if (toastTimeoutId) window.clearTimeout(toastTimeoutId);
-    toastTimeoutId = window.setTimeout(() => {
+    toastTimeoutId = window.setTimeout(function() {
       toastEl.className = 'toast';
     }, 4000);
   }
@@ -3218,7 +3252,7 @@
     });
   })();
 
-  document.addEventListener('DOMContentLoaded', function() {
+  function initWithdraw() {
     var btn = document.getElementById('btnWithdraw');
     var modal = document.getElementById('withdrawModal');
     function closeWithdraw() {
@@ -3244,36 +3278,37 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeWithdraw();
     });
-    var submitBtn = document.getElementById('withdrawSubmit');
-    if (submitBtn) submitBtn.addEventListener('click', function() {
-      var net = (document.getElementById('withdrawNetwork') || {}).value || '';
-      var wallet = (document.getElementById('withdrawWallet') || {}).value || '';
-      if (!net.trim()) {
-        if (typeof showToast === 'function') showToast('Select crypto and enter wallet address.', 'error');
-        else alert('Select crypto and enter wallet address.');
-        return;
-      }
-      if (!wallet || wallet.trim().length < 12) {
-        if (typeof showToast === 'function') showToast('Wallet address must be at least 12 characters.', 'error');
-        else alert('Wallet address must be at least 12 characters.');
-        return;
-      }
-      var tx = {
-        id: 'w' + Date.now(),
-        email: accountState.currentUserEmail || '',
-        network: net.trim(),
-        wallet: wallet.trim(),
-        amount: accountState.refundBtc != null ? accountState.refundBtc : 0,
-        status: 'In progress',
-        date: new Date().toISOString()
-      };
-      var list = JSON.parse(localStorage.getItem('withdrawals') || '[]');
-      list.push(tx);
-      localStorage.setItem('withdrawals', JSON.stringify(list));
-      closeWithdraw();
-      if (typeof showToast === 'function') showToast('Transaction in progress', 'success');
-      if (typeof renderTx === 'function') renderTx();
-    });
+    var form = document.querySelector('#withdrawModal form');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var crypto = form.querySelector('select').value;
+        var addr = (form.querySelector('input').value || '').trim();
+        if (!crypto || addr.length < 10) {
+          alert('Enter wallet address');
+          return;
+        }
+        var tx = {
+          id: 'w' + Date.now(),
+          email: accountState.currentUserEmail || '',
+          network: crypto,
+          wallet: addr,
+          amount: accountState.refundBtc != null ? accountState.refundBtc : 0,
+          status: 'In progress',
+          date: new Date().toISOString()
+        };
+        var list = JSON.parse(localStorage.getItem('withdrawals') || '[]');
+        list.push(tx);
+        localStorage.setItem('withdrawals', JSON.stringify(list));
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+        showToast('Withdrawal request sent successfully');
+        if (typeof renderTx === 'function') renderTx();
+      });
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    initWithdraw();
   });
 
   (function initAdminNav() {
@@ -3556,20 +3591,22 @@
   updateHeaderButtons();
 </script>
   <!-- Withdraw modal (в конце body, поверх всего) -->
-  <div id="withdrawModal" class="modal-overlay">
+  <div id="withdrawModal">
     <div class="modal">
       <button type="button" class="modal-close" id="withdrawModalClose" aria-label="Close">&times;</button>
       <h3>Withdraw funds</h3>
-      <label>Choose crypto</label>
-      <select id="withdrawNetwork">
-        <option value="">Select</option>
-        <option value="BTC">BTC</option>
-        <option value="ETH">ETH</option>
-        <option value="USDT">USDT</option>
-      </select>
-      <label>Wallet address</label>
-      <input id="withdrawWallet" placeholder="Enter your wallet address">
-      <button id="withdrawSubmit" class="btn-primary">Submit</button>
+      <form id="withdrawForm">
+        <label>Choose crypto</label>
+        <select id="withdrawNetwork">
+          <option value="">Select</option>
+          <option value="BTC">BTC</option>
+          <option value="ETH">ETH</option>
+          <option value="USDT">USDT</option>
+        </select>
+        <label>Wallet address</label>
+        <input id="withdrawWallet" placeholder="Enter your wallet address">
+        <button type="submit" class="btn-primary">Send</button>
+      </form>
     </div>
   </div>
 </body>
